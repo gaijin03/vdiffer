@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-#use strict;
+use strict;
 use Getopt::Long;
 
 #Author Brian Christiansen
@@ -16,49 +16,41 @@ my $kompare; #default gvim
 my $cached; #default gvim
 my $revision;
 
-my $result = GetOptions ("vim" => \$vim,
-                         "kom" => \$kompare,
-                         "cached" => \$cached,
-                         "revision=s" => \$revision);
+GetOptions ("vim" => \$vim,
+            "kom" => \$kompare,
+            "cached" => \$cached,
+            "revision=s" => \$revision)
+or die "Error in command line arguments";
 
-$cached_str = "";
+my $cached_str = "";
 if (defined $cached) {
   $cached_str = "--cached";
 }
 
-
 $vim = 1 if (defined $ENV{"SSH_CONNECTION"});
 
-if ($ARGV[0])
-{
+if ($ARGV[0]) {
   my $file = $ARGV[0];
   die "$file doesn't exist. $!\n" unless (-e $file);
   DiffFile($file);
-}
-else
-{
+} else {
   my $diffcmd;
 
-  if (defined $revision)
-  {
-    $diffcmd = "git diff $cached_str -c $revision";
+  if (defined $revision) {
+    $diffcmd = "git diff $revision";
   } else {
     $diffcmd = "git diff $cached_str";
   }
 
   @diffs = `$diffcmd`;
 
-  if (defined $kompare)
-  {
+  if (defined $kompare) {
     `git diff > $tmpFile`;
     system("kompare $tmpFile");
-  }
-  else
-  {
+  } else {
     map { push @modFiles, $1 if m/^--- a\/(\S+)\s+/ } @diffs;
 
     foreach my $file (@modFiles){
-
       DiffFile($file);
     }
   }
@@ -69,47 +61,29 @@ exit 0;
 sub DiffFile
 {
   my $file = $_[0];
-  my $cstring = "";
-  my $rstring = "";
   my $diffCmd = "";
 
-  if (defined $revision)
-  {
-    $cstring = "-c $revision";
-    $rstring = "-r $revision";
-  }
+  # need current file with changes.
+  #`cp $file $tmpFile`;
+  `git show HEAD:$file > $tmpFile`;
 
-  if (defined $revision)
-  {
-    `git cat $rstring $file > $tmpOrig`;
+  if (!$revision) {
+    `git diff $cached_str $file > $tmpDiff`;
+  } else {
+    `git diff master..HEAD $file > $tmpDiff`;
   }
-  else
-  { # need current file with changes.
-    `cp $file $tmpOrig`;
-  }
-
-  `cp $tmpOrig $tmpFile`;
-  `git diff $cached_str $cstring $file > $tmpDiff`;
+  # Revert changes on current file to see differences.
   `patch -R -p1 $tmpFile $tmpDiff`;
 
-  if (defined $vim)
-  {
+  if (defined $vim) {
     $diffCmd = "vimdiff";
-  }
-  else
-  { # -f prevents gvim from forking
+  } else {
+    # -f prevents gvim from forking
     $diffCmd = "gvimdiff -f";
   }
 
   # When diffing local changes the original must be used so
   # changes can be made in the original.
-  if (defined $revision)
-  {
-    system("$diffCmd $tmpOrig $tmpFile");
-  }
-  else
-  {
-    system("$diffCmd $file $tmpFile");
-  }
+  system("$diffCmd $file $tmpFile");
 }
 
