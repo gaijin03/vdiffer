@@ -6,52 +6,59 @@ use Getopt::Long;
 # USAGE: [--revision <revision>] [--vim] [--kom] [FILE]
 # default is to use gvim but will use vim if ssh'ed in.
 
-my @hgDiff;
+my @diffs;
 my @modFiles;
 my $tmpOrig = "tmporig";
 my $tmpFile = "tmpfile";
 my $tmpDiff = "tmpdiff";
 my $vim; #default gvim
 my $kompare; #default gvim
+my $cached; #default gvim
 my $revision;
 
 my $result = GetOptions ("vim" => \$vim,
                          "kom" => \$kompare,
-                         "revision=i" => \$revision);
+                         "cached" => \$cached,
+                         "revision=s" => \$revision);
+
+$cached_str = "";
+if (defined $cached) {
+  $cached_str = "--cached";
+}
 
 
 $vim = 1 if (defined $ENV{"SSH_CONNECTION"});
 
 if ($ARGV[0])
 {
-  my $file = $ARGV[0]; 
+  my $file = $ARGV[0];
   die "$file doesn't exist. $!\n" unless (-e $file);
   DiffFile($file);
 }
 else
 {
-  my $hgdiffcmd;
+  my $diffcmd;
 
   if (defined $revision)
   {
-    $hgdiffcmd = "hg diff -c $revision";
+    $diffcmd = "git diff $cached_str -c $revision";
   } else {
-    $hgdiffcmd = "hg diff";
+    $diffcmd = "git diff $cached_str";
   }
 
-  @hgDiff = `$hgdiffcmd`;
+  @diffs = `$diffcmd`;
 
   if (defined $kompare)
   {
-    `hg diff > $tmpFile`;
+    `git diff > $tmpFile`;
     system("kompare $tmpFile");
   }
   else
   {
-    map { push @modFiles, $1 if m/^--- a\/(\S+)\s+/ } @hgDiff;
+    map { push @modFiles, $1 if m/^--- a\/(\S+)\s+/ } @diffs;
 
     foreach my $file (@modFiles){
-    
+
       DiffFile($file);
     }
   }
@@ -74,15 +81,15 @@ sub DiffFile
 
   if (defined $revision)
   {
-  `hg cat $rstring $file > $tmpOrig`;
+    `git cat $rstring $file > $tmpOrig`;
   }
   else
   { # need current file with changes.
-  `cp $file $tmpOrig`;
+    `cp $file $tmpOrig`;
   }
 
   `cp $tmpOrig $tmpFile`;
-  `hg diff $cstring $file > $tmpDiff`;
+  `git diff $cached_str $cstring $file > $tmpDiff`;
   `patch -R -p1 $tmpFile $tmpDiff`;
 
   if (defined $vim)
@@ -91,12 +98,12 @@ sub DiffFile
   }
   else
   { # -f prevents gvim from forking
-    $diffCmd = "gvimdiff -f"; 
+    $diffCmd = "gvimdiff -f";
   }
-  
-  # When diffing local changes the original must be used so 
+
+  # When diffing local changes the original must be used so
   # changes can be made in the original.
-  if (defined $revision) 
+  if (defined $revision)
   {
     system("$diffCmd $tmpOrig $tmpFile");
   }
