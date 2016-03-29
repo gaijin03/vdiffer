@@ -61,7 +61,7 @@ sub DiffFile
   if (!$revision) {
     `git diff $cached_str $file > $tmpDiff`;
   } else {
-    `git diff master..HEAD $file > $tmpDiff`;
+    `git diff $revision $file > $tmpDiff`;
   }
   # Revert changes on current file to see differences.
   `patch -R -p1 $tmpFile $tmpDiff`;
