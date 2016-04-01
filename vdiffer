@@ -42,8 +42,12 @@ if ($ARGV[0]) {
 
   @diffs = `$diffcmd`;
   map { push @modFiles, $1 if m/^--- a\/(\S+)\s+/ } @diffs;
+  my $size = scalar(@modFiles);
+  my $num  = 1;
   foreach my $file (@modFiles){
+    print "($num/$size): $file\n";
     DiffFile($file);
+    $num++;
   }
 }
 
@@ -64,7 +68,7 @@ sub DiffFile
     `git diff $revision $file > $tmpDiff`;
   }
   # Revert changes on current file to see differences.
-  `patch -R -p1 $tmpFile $tmpDiff`;
+  print `patch -R -p1 $tmpFile $tmpDiff`;
 
   if (defined $vim) {
     $diffCmd = "vimdiff";
